@@ -1,0 +1,58 @@
+{
+  "workmeter": {
+    "emp_key": "d6370d94e7d7debbea5e54d0ca696ecb",
+    "emp_name": "Thomas Mathew",
+    "work_hour": "11",
+    "work_minute": "39",
+    "attendance": [
+      {
+        "in": "08:58",
+        "out": "09:23",
+        "worked_time": "1546"
+      },
+      {
+        "in": "09:53",
+        "out": "13:44",
+        "worked_time": "13862"
+      },
+      {
+        "in": "14:05",
+        "out": "17:03",
+        "worked_time": "10726"
+      },
+      {
+        "in": "17:32",
+        "out": "19:58",
+        "worked_time": "8755"
+      },
+      {
+        "in": "20:32",
+        "out": "21:27",
+        "worked_time": "3290"
+      },
+      {
+        "in": "21:27",
+        "out": "",
+        "worked_time": ""
+      }
+    ],
+    "in_out": "I",
+    "week_hour": "39",
+    "week_minute": "54",
+    "w1": "",
+    "w2": "",
+    "w3": "",
+    "w4": "15:34",
+    "cl": "5.50",
+    "el": "20.00",
+    "ml": "2.00",
+    "mgr_pending": "0.00",
+    "you_pending": "0.00",
+    "updated_at": "2020-04-12 15:26:24.004",
+    "leave_status": "14Aug(08:00)-H,09Aug(08:00)-R,21Aug(08:00)-P,20Aug(08:00)-P,16Aug(08:00)-P,12Aug(08:00)-P,05Aug(08:00)-P,07Aug(08:00)-P,06Aug(08:00)-P,19Aug(08:00)-P,13Aug(08:00)-P,01Aug(08:00)-P,08Aug(08:00)-P,30Jul(08:00)-P,02Aug(08:00)-P,29Jul(08:00)-P,26Jul(08:00)-P,31Jul(08:00)-P"
+  },
+  "no_data": {
+    "workedTime": "NDF",
+    "workedAsInt": "0000"
+  }
+} 

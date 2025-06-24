@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Development",
+      "request": "launch",
+      "type": "dart",
+      "env": {
+        "DEVELOPMENT": "true",
+        "API_URL": "http://localhost:3000/api/"
+      }
+    },
+    {
+      "name": "Production",
+      "request": "launch",
+      "type": "dart",
+      "env": {
+        "DEVELOPMENT": "false",
+        "API_URL": "http://workmeter.herokuapp.com/services/c/"
+      }
+    }
+  ]
+}
