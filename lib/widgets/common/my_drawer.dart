@@ -4,6 +4,9 @@ import '../../pages/attendance_home_page.dart';
 import '../../pages/leave_requests_home_page.dart';
 import '../../pages/user_profile.dart';
 import '../../pages/about.dart';
+import '../../pages/gps_checkin_page.dart';
+import '../../pages/enhanced_leave_application_page.dart';
+import '../../pages/reporting_dashboard_page.dart';
 import '../../services/app_theme.dart';
 
 class MyDrawer extends StatelessWidget {
@@ -201,6 +204,65 @@ class MyDrawer extends StatelessWidget {
                       },
                       badge: _getTotalLeaves(),
                       badgeColor: AppTheme.warningColor,
+                    ),
+                    
+                    const SizedBox(height: 8),
+                    
+                    // GPS Check-in
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.location_on_rounded,
+                      title: 'GPS Check-in',
+                      subtitle: 'Location-based attendance',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => GPSCheckinPage(),
+                          ),
+                        );
+                      },
+                      badge: _inOutStatus == 'I' ? 'IN' : null,
+                      badgeColor: AppTheme.successColor,
+                    ),
+                    
+                    const SizedBox(height: 8),
+                    
+                    // Enhanced Leave Application
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.add_circle_outline_rounded,
+                      title: 'Apply Leave',
+                      subtitle: 'Submit new leave request',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EnhancedLeaveApplicationPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    
+                    const SizedBox(height: 8),
+                    
+                    // Reports Dashboard
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.analytics_rounded,
+                      title: 'Reports & Analytics',
+                      subtitle: 'View insights & charts',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ReportingDashboardPage(),
+                          ),
+                        );
+                      },
                     ),
                     
                     const SizedBox(height: 8),

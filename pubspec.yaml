@@ -17,6 +17,24 @@ dependencies:
   rflutter_alert: ^2.0.7
   provider: ^6.1.2
   flutter_local_notifications: ^17.1.2
+  # GPS and Location Services
+  geolocator: ^11.0.0
+  geocoding: ^3.0.0
+  permission_handler: ^11.3.1
+  # Charts and Reporting
+  fl_chart: ^0.68.0
+  syncfusion_flutter_charts: ^25.2.7
+  # Date and Time
+  table_calendar: ^3.0.9
+  timezone: ^0.9.4
+  # Enhanced UI
+  animations: ^2.0.11
+  # Firebase for Push Notifications (optional, can be configured later)
+  # firebase_core: ^2.24.2
+  # firebase_messaging: ^14.7.10
+  # Enhanced functionality
+  device_info_plus: ^10.1.0
+  package_info_plus: ^6.0.0
 
 
 dev_dependencies:

@@ -3,10 +3,18 @@ import 'package:provider/provider.dart';
 import './app_state.dart';
 
 import './services/app_theme.dart';
+import './services/notification_service.dart';
+import './services/leave_service.dart';
 import './pages/login.dart';
 import './config/app_config.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize services
+  await NotificationService.initialize();
+  await LeaveService.initializeLeaveTypes();
+  
   // Initialize and validate configuration
   AppConfig.printConfig();
   if (!AppConfig.validateConfig()) {
