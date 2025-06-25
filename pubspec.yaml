@@ -1,5 +1,5 @@
-name: workmeter
-description: A modern time tracking and attendance management application built with Flutter.
+name: work_meter
+description: WorkMeter - A modern time tracking and attendance management application built with Flutter.
 version: 1.0.0+1
 
 environment:

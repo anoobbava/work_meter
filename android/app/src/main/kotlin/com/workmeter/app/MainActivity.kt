@@ -1,4 +1,4 @@
-package com.example.ruby_work_meter_new
+package com.workmeter.app
 
 import io.flutter.embedding.android.FlutterActivity
 

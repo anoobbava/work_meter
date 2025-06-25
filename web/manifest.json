@@ -1,11 +1,11 @@
 {
-    "name": "ruby_work_meter_new",
-    "short_name": "ruby_work_meter_new",
+    "name": "WorkMeter",
+    "short_name": "WorkMeter",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "WorkMeter - A modern time tracking and attendance management application.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
