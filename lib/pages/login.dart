@@ -9,6 +9,7 @@ import './home_page.dart';
 import './no_data_found.dart';
 import '../services/api_service.dart';
 import '../services/environment_config.dart';
+import '../services/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -18,22 +19,50 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
-  // will handle the key from the user via text field
   final keyController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   bool isLoading = false;
-  late AnimationController _controller;
+  bool _isPasswordVisible = false;
+  late AnimationController _logoController;
+  late AnimationController _formController;
+  late Animation<double> _logoAnimation;
+  late Animation<Offset> _formAnimation;
 
   @override
   void initState() {
     super.initState();
     _checkLoginPage();
-    _controller = AnimationController(
+    _initAnimations();
+  }
+
+  void _initAnimations() {
+    _logoController = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 2),
+      duration: const Duration(milliseconds: 1500),
     );
-    _controller.repeat();
-    // below for 1 time process
-    // _controller.forward();
+    
+    _formController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+
+    _logoAnimation = CurvedAnimation(
+      parent: _logoController,
+      curve: Curves.elasticOut,
+    );
+
+    _formAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _formController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _logoController.forward();
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _formController.forward();
+    });
   }
 
   Future<void> _checkLoginPage() async {
@@ -43,7 +72,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     }
   }
 
-// if the key is already there, then we can easily redirect to the home page
   void _replaceWithHomePage() {
     Navigator.pushReplacement(
       context,
@@ -51,19 +79,14 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     );
   }
 
-  // will redirect to to the No Data found page
   void _redirectToNoDataPage() {
     Navigator.push(context,
         MaterialPageRoute(builder: (BuildContext context) => NoData()));
   }
 
-  // connection is okay, but workmeter needed fresh data from orange hrm
-  // here, response we get is {"workedTime":"NDF","workedAsInt":"0000"}
-  // so the user is not entered the office so far
   _checkResponseFromOrgangeHrm(jsonResponse) {
     if (jsonResponse['workedTime'] == 'NDF') {
       print('NDF DATA On Signup Page');
-      // redirect to no data page
       _redirectToNoDataPage();
     } else {
       _replaceWithHomePage();
@@ -73,191 +96,64 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   @override
   void dispose() {
     keyController.dispose();
-    _controller.dispose();
+    _logoController.dispose();
+    _formController.dispose();
     super.dispose();
   }
 
-// calls this method to display the confirmation if the user dont know where to get
-// the code
-  void _checkOrangeHrm(BuildContext context) {
+  void _showInfoDialog() {
     showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: Text('Check Hrm Site'),
-            content: Text('Login to your Hrm Site and copy the workmeter key.'),
-          );
-        });
-  }
-
-  // will display the header and linear gradient
-  Widget _generateHeaderContainer(screenWidth) {
-    return Container(
-      height: 200,
-      width: screenWidth,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.purple[200]!, Colors.orange[300]!],
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
-        color: Colors.green,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.elliptical(120.0, 120.0),
-          bottomRight: Radius.elliptical(120.0, 120.0),
-        ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        title: Row(
           children: [
-            Text(
-              'WORK METER',
-              style: TextStyle(
-                  fontSize: 25.0,
-                  color: Theme.of(context).colorScheme.secondary,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'openSans'),
+            Icon(
+              Icons.info_outline,
+              color: AppTheme.primaryColor,
             ),
-            if (EnvironmentConfig.isDevelopment)
-              Container(
-                margin: EdgeInsets.only(top: 8),
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'DEVELOPMENT MODE',
-                  style: TextStyle(
-                    fontSize: 12.0,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+            const SizedBox(width: 8),
+            Text(
+              'How to get your key',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-// will display the image for work meter logo
-  Widget _geneateWorkMeterLogo() {
-    return Center(
-      child: ScaleTransition(
-        scale: Tween(begin: 0.0, end: 1.0).animate(
-          CurvedAnimation(curve: Curves.elasticOut, parent: _controller),
-        ),
-        child: Container(
-          width: 180.0,
-          height: 180.0,
-          decoration: BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage('images/logo.png'),
-              fit: BoxFit.cover,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '1. Login to your HRM system',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-// display the user input
-  Widget _acceptCodeFromUser() {
-    return Container(
-      padding: EdgeInsets.only(top: 30.0),
-      child: TextField(
-        controller: keyController,
-        style: TextStyle(fontSize: 20.0, color: Theme.of(context).colorScheme.secondary),
-        enableInteractiveSelection: true,
-        obscureText: !EnvironmentConfig.isDevelopment, // Show key in development mode
-        decoration: InputDecoration(
-          hintStyle: TextStyle(
-              color: Theme.of(context).colorScheme.secondary, fontFamily: 'OpenSans'),
-          hintText: EnvironmentConfig.isDevelopment ? 'Enter any key (dev mode)' : 'Enter your code',
-          prefixIcon: Icon(
-            Icons.edit,
-            color: Theme.of(context).colorScheme.secondary,
-          ),
-        ),
-      ),
-    );
-  }
-
-  //
-  Widget _displayButtonForSignin() {
-    return isLoading
-        ? Center(
-            child: CircularProgressIndicator(),
-          )
-        : ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Theme.of(context).colorScheme.secondary,
-              minimumSize: Size(150.0, 50.0),
-              elevation: 20.0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20.0),
-              ),
+            const SizedBox(height: 8),
+            Text(
+              '2. Navigate to your profile or work meter section',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-            onPressed: () {
-              _processUserInput(context);
-            },
+            const SizedBox(height: 8),
+            Text(
+              '3. Copy your unique work meter key',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '4. Paste it in the field above',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
             child: Text(
-              'Sign in',
+              'Got it',
               style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20.0,
-                  fontFamily: 'openSans',
-                  color: Theme.of(context).colorScheme.secondary),
-            ),
-          );
-  }
-
-  Widget _displayNoCodeMessage(BuildContext context) {
-    return InkWell(
-      onTap: () => _checkOrangeHrm(context),
-      child: Text(
-        "Didn't get the code ?",
-        style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18.0,
-            color: Theme.of(context).colorScheme.secondary,
-            fontFamily: 'openSans'),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    ToastContext().init(context);
-    Size size = MediaQuery.of(context).size;
-    return Scaffold(
-      body: Stack(
-        children: <Widget>[
-          _generateHeaderContainer(size.width),
-          SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                children: <Widget>[
-                  SizedBox(
-                    height: size.height / 7.5,
-                  ),
-                  _geneateWorkMeterLogo(),
-                  Padding(
-                    padding: EdgeInsets.only(top: 30.0),
-                  ),
-                  _acceptCodeFromUser(),
-                  Padding(
-                    padding: EdgeInsets.only(top: 30.0),
-                  ),
-                  _displayButtonForSignin(),
-                  Padding(
-                    padding: EdgeInsets.all(30.0),
-                  ),
-                  _displayNoCodeMessage(context)
-                ],
+                color: AppTheme.primaryColor,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -266,68 +162,302 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     );
   }
 
-  //Handles the User input and check if it is success, then to Details Page
-  _processUserInput(BuildContext context) {
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     setState(() {
       isLoading = true;
     });
-    
-    // In development mode, allow empty key
-    if (!EnvironmentConfig.isDevelopment && keyController.text == '') {
-      return _dialogForNoKey(context);
-    } else {
-      return _checkInternet(context);
-    }
-  }
 
-// handles the user input to check it is blank or not
-  void _dialogForNoKey(BuildContext context) {
-    Toast.show("Please Add the User Key");
-    setState(() {
-      isLoading = false;
-    });
-  }
-
-  // if user enters the key is not present in the Hr Server, need to confirm that too
-  void _checkForValidKey(BuildContext context) async {
-    print('_checkForValidKey');
-    var apiKey = keyController.text;
-    
     try {
-      // Use the new API service
-      var jsonResponse = await ApiService.validateApiKey(apiKey);
+      final result = await ApiService.login(keyController.text.trim());
       
-      print('api success');
-      return _saveApiKey(jsonResponse);
-    } catch (e) {
-      print('Error: $e');
-      Toast.show("Entered Key is invalid");
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
-
-  // if there is no internet connection at the time of login, need to display that too.
-  _checkInternet(BuildContext context) async {
-    try {
-      final result = await InternetAddress.lookup('google.com');
-      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-        return _checkForValidKey(context);
+      if (result['success']) {
+        _checkResponseFromOrgangeHrm(result['data']);
+      } else {
+        _showErrorMessage(result['message'] ?? 'Login failed. Please try again.');
       }
-    } on SocketException catch (_) {
-      Toast.show("Active Internet Connection needed");
+    } catch (e) {
+      _showErrorMessage('Network error. Please check your connection.');
+    } finally {
       setState(() {
         isLoading = false;
       });
     }
   }
 
-  // save the Api Key to shared preferences and redirect to page
-  _saveApiKey(jsonResponse) async {
-    // Store user data using the new API service
-    await ApiService.storeUserData(jsonResponse);
-    print('key saved successfully');
-    _checkResponseFromOrgangeHrm(jsonResponse);
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.errorColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Container(
+            height: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top,
+            child: Column(
+              children: [
+                // Header Section
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.primaryGradient,
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(40),
+                        bottomRight: Radius.circular(40),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Logo Animation
+                        ScaleTransition(
+                          scale: _logoAnimation,
+                          child: Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.white.withOpacity(0.3),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(30),
+                              child: Image.asset(
+                                'images/logo.png',
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        // App Title
+                        FadeTransition(
+                          opacity: _logoAnimation,
+                          child: Column(
+                            children: [
+                              Text(
+                                'WORK METER',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontFamily: 'OpenSans',
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Track your work hours effortlessly',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontFamily: 'OpenSans',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // Development Mode Badge
+                        if (EnvironmentConfig.isDevelopment)
+                          FadeTransition(
+                            opacity: _logoAnimation,
+                            child: Container(
+                              margin: const EdgeInsets.only(top: 16),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: AppTheme.warningColor,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.warningColor.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: const Text(
+                                'DEVELOPMENT MODE',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Form Section
+                Expanded(
+                  flex: 3,
+                  child: SlideTransition(
+                    position: _formAnimation,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Welcome Text
+                          Text(
+                            'Welcome back!',
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Please enter your work meter key to continue',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 32),
+                          
+                          // Login Form
+                          Form(
+                            key: _formKey,
+                            child: Column(
+                              children: [
+                                // Key Input Field
+                                Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: isDark 
+                                          ? Colors.black.withOpacity(0.3)
+                                          : Colors.black.withOpacity(0.1),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: TextFormField(
+                                    controller: keyController,
+                                    obscureText: !EnvironmentConfig.isDevelopment && !_isPasswordVisible,
+                                    validator: (value) {
+                                      if (value == null || value.trim().isEmpty) {
+                                        return 'Please enter your work meter key';
+                                      }
+                                      return null;
+                                    },
+                                    decoration: InputDecoration(
+                                      labelText: 'Work Meter Key',
+                                      hintText: EnvironmentConfig.isDevelopment 
+                                        ? 'Enter any key (dev mode)' 
+                                        : 'Enter your unique key',
+                                      prefixIcon: Icon(
+                                        Icons.key,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                      suffixIcon: !EnvironmentConfig.isDevelopment
+                                        ? IconButton(
+                                            icon: Icon(
+                                              _isPasswordVisible 
+                                                ? Icons.visibility_off 
+                                                : Icons.visibility,
+                                              color: AppTheme.primaryColor,
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                _isPasswordVisible = !_isPasswordVisible;
+                                              });
+                                            },
+                                          )
+                                        : null,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                
+                                // Login Button
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 56,
+                                  child: ElevatedButton(
+                                    onPressed: isLoading ? null : _handleLogin,
+                                    child: isLoading
+                                      ? SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                          ),
+                                        )
+                                      : Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.login),
+                                            const SizedBox(width: 8),
+                                            Text('Sign In'),
+                                          ],
+                                        ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                
+                                // Help Link
+                                TextButton.icon(
+                                  onPressed: _showInfoDialog,
+                                  icon: Icon(
+                                    Icons.help_outline,
+                                    color: AppTheme.primaryColor,
+                                    size: 20,
+                                  ),
+                                  label: Text(
+                                    'Need help finding your key?',
+                                    style: TextStyle(
+                                      color: AppTheme.primaryColor,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

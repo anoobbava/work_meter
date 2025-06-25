@@ -1,5 +1,5 @@
-name: ruby_work_meter
-description: A new Flutter project.
+name: workmeter
+description: A modern time tracking and attendance management application built with Flutter.
 version: 1.0.0+1
 
 environment:
@@ -50,3 +50,4 @@ flutter:
     - family: Courgette
       fonts:
         - asset: assets/fonts/Courgette-Regular.ttf
+

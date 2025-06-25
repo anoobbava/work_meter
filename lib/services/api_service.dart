@@ -20,6 +20,17 @@ class ApiService {
     await prefs.setString(_apiKeyPref, apiKey);
   }
   
+  // Login method for UI compatibility
+  static Future<Map<String, dynamic>> login(String apiKey) async {
+    try {
+      final data = await validateApiKey(apiKey);
+      await _storeApiKey(apiKey);
+      return {'success': true, 'data': data};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   // Validate API key (for production mode)
   static Future<Map<String, dynamic>> validateApiKey(String apiKey) async {
     if (EnvironmentConfig.isDevelopment) {

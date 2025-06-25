@@ -1,271 +1,627 @@
 import 'package:flutter/material.dart';
-import 'package:toast/toast.dart';
-import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:rflutter_alert/rflutter_alert.dart';
-import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
-import '../app_state.dart';
+import '../services/app_theme.dart';
+import '../services/api_service.dart';
 import './home_page.dart';
 
 class UserProfile extends StatefulWidget {
   final String? userName;
-  const UserProfile(this.userName);
+  
+  const UserProfile(this.userName, {Key? key}) : super(key: key);
+  
   @override
   _UserProfileState createState() => _UserProfileState();
 }
 
-class _UserProfileState extends State<UserProfile> {
+class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin {
   final keyController = TextEditingController();
   bool isLoading = false;
+  bool isUpdatingKey = false;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+  
+  String? _lastLoginTime;
+  String? _apiKey;
 
   @override
   void initState() {
     super.initState();
+    _initAnimations();
+    _loadProfileData();
+  }
+
+  void _initAnimations() {
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ));
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _animationController.forward();
+  }
+
+  Future<void> _loadProfileData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _lastLoginTime = prefs.getString('last_login') ?? 
+        DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
+      _apiKey = prefs.getString('api_key');
+    });
   }
 
   @override
   void dispose() {
     keyController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
-  // handles the user input to check it is blank or not
-  void _dialogForNoKey(BuildContext context) {
-    Toast.show("Please Add the User Key");
+  Future<void> _updateApiKey() async {
+    if (keyController.text.trim().isEmpty) {
+      _showSnackBar('Please enter a valid API key', AppTheme.errorColor);
+      return;
+    }
+
     setState(() {
-      isLoading = false;
+      isUpdatingKey = true;
     });
-  }
 
-  Widget _displayDarkModeOption() {
-    return Switch(
-      activeColor: Colors.green,
-      inactiveThumbColor: Colors.red,
-      // value: darkMode,
-      value: Provider.of<AppState>(context).isDarkModeOn,
-      onChanged: (bool newValue) {
-        Provider.of<AppState>(context).updateTheme(newValue);
-      },
-    );
-  }
-
-  Widget _displayDarkMessage() {
-    return Text(
-      'dark Mode',
-      style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 15.0,
-          color: Theme.of(context).colorScheme.secondary,
-          fontFamily: 'openSans'),
-    );
-  }
-
-  // if there is no internet connection at the time of login, need to display that too.
-  _checkActiveNetwork(BuildContext context) async {
     try {
-      final result = await InternetAddress.lookup('google.com');
-      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-        _updateKeyToSharedPreference();
+      final result = await ApiService.login(keyController.text.trim());
+      
+      if (result['success']) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('last_login', DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now()));
+        
+        keyController.clear();
+        _showSnackBar('API key updated successfully!', AppTheme.successColor);
+        
+        // Navigate back to home page
+        await Future.delayed(const Duration(seconds: 1));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
+      } else {
+        _showSnackBar(result['message'] ?? 'Failed to update API key', AppTheme.errorColor);
       }
-    } on SocketException catch (_) {
-      Toast.show("Active Internet Connection needed");
+    } catch (e) {
+      _showSnackBar('Error updating API key: $e', AppTheme.errorColor);
+    } finally {
+      setState(() {
+        isUpdatingKey = false;
+      });
     }
   }
 
-  _updateKeyToSharedPreference() async {
-    print('key updated');
-    print(keyController.text);
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setString('api_key', keyController.text);
-    print('key updated successfully');
-    keyController.text = '';
-    Alert(
+  void _showSnackBar(String message, Color backgroundColor) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  Future<void> _logout() async {
+    showDialog(
       context: context,
-      type: AlertType.success,
-      title: 'Key Update Success',
-      desc: 'You Data will be refreshed in a minute',
-      buttons: [
-        DialogButton(
-          child: Text(
-            'OK',
-            style: TextStyle(
-                color: Theme.of(context).primaryColor,
-                fontSize: 22,
-                fontFamily: 'openSans'),
-          ),
-          onPressed: () => _replaceWithHomePage(),
-          width: 120,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.logout, color: AppTheme.warningColor),
+            const SizedBox(width: 8),
+            const Text('Logout'),
+          ],
         ),
-      ],
-    ).show();
-    FocusScope.of(context).unfocus();
-    setState(
-      () {
-        isLoading = false;
-      },
-    );
-  }
-
-  //Handles the User input and check if it is success, then to Details Page
-  _processUserInput(BuildContext context) {
-    setState(() {
-      isLoading = true;
-    });
-    if (keyController.text == '') {
-      return _dialogForNoKey(context);
-    } else {
-      return _checkActiveNetwork(context);
-    }
-  }
-
-  // if the key is already there, then we can easily redirect to the home page
-  void _replaceWithHomePage() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => HomePage()),
-    );
-  }
-
-  PreferredSizeWidget _appBar(BuildContext context) {
-    return AppBar(
-      // for removing the shade from appbar
-      centerTitle: true,
-      backgroundColor: Colors.transparent,
-      bottomOpacity: 0.0,
-      elevation: 0.0,
-      title: Text(
-        'Your Profile',
-        style: TextStyle(
-            color: Theme.of(context).colorScheme.secondary,
-            fontWeight: FontWeight.bold,
-            fontSize: 22.0,
-            fontFamily: 'openSans'),
-      ),
-    );
-  }
-
-  Widget _displayImage() {
-    return Container(
-      alignment: Alignment.center,
-      child: Image.asset(
-        'images/happy_icon.png',
-        width: 300.0,
-        height: 150.0,
-      ),
-    );
-  }
-
-  Widget _displayUserName(BuildContext context) {
-    return Text(
-      widget.userName!,
-      style: TextStyle(
-          fontSize: 28.0,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.secondary,
-          fontFamily: 'Courgette'),
-    );
-  }
-
-  Widget _displayTextField() {
-    return Container(
-      child: TextField(
-        controller: keyController,
-        style: TextStyle(fontSize: 20.0),
-        enableInteractiveSelection: true,
-        obscureText: true,
-        decoration: InputDecoration(
-          hintText: 'Enter new Key',
-          prefixIcon: Icon(Icons.edit),
-          fillColor: Colors.white,
-          hintStyle: TextStyle(
-            fontSize: 22.0,
-            color: Colors.white,
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
+          ElevatedButton(
+            onPressed: () async {
+              await ApiService.logout();
+              Navigator.pop(context);
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: AppTheme.primaryGradient,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
         ),
       ),
-    );
-  }
-
-  Widget _displayButtonToSave() {
-    return Center(
-      child: isLoading
-          ? Center(
-              child: CircularProgressIndicator(),
-            )
-          : ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Theme.of(context).colorScheme.secondary,
-                minimumSize: Size(200.0, 50.0),
-                elevation: 20.0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20.0),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            // App Bar
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_ios_new,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
                 ),
-              ),
-              onPressed: () {
-                _processUserInput(context);
-              },
-              child: Text(
-                'Update Key',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20.0,
-                    color: Theme.of(context).colorScheme.secondary,
-                    fontFamily: 'openSans'),
+                Expanded(
+                  child: Text(
+                    'Profile',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontFamily: 'OpenSans',
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                IconButton(
+                  onPressed: _logout,
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.logout,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            
+            // Profile Avatar and Info
+            FadeTransition(
+              opacity: _fadeAnimation,
+              child: Column(
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(50),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        width: 3,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(47),
+                      child: Image.asset(
+                        'images/profile_icon.png',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            Icons.person,
+                            size: 50,
+                            color: Colors.white.withValues(alpha: 0.8),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    widget.userName ?? 'User',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontFamily: 'OpenSans',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.work,
+                          size: 16,
+                          color: Colors.white.withValues(alpha: 0.8),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Employee',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontFamily: 'OpenSans',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileStats() {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Profile Information',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Stats Row
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatCard(
+                    'Last Login',
+                    _lastLoginTime ?? 'Never',
+                    Icons.schedule,
+                    AppTheme.primaryColor,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatCard(
+                    'Account Status',
+                    'Active',
+                    Icons.check_circle,
+                    AppTheme.successColor,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApiKeySection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'API Key Management',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.key,
+                      color: AppTheme.primaryColor,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Update Your API Key',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                Text(
+                  'Enter a new API key to update your work meter connection. Your data will be refreshed automatically.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // API Key Input
+                TextFormField(
+                  controller: keyController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'New API Key',
+                    hintText: 'Enter your new work meter key',
+                    prefixIcon: Icon(Icons.vpn_key, color: AppTheme.primaryColor),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Update Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: isUpdatingKey ? null : _updateApiKey,
+                    child: isUpdatingKey
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text('Updating...'),
+                          ],
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.update),
+                            const SizedBox(width: 8),
+                            const Text('Update API Key'),
+                          ],
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quick Actions',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionCard(
+                  'Refresh Data',
+                  'Update work information',
+                  Icons.refresh,
+                  AppTheme.primaryColor,
+                  () {
+                    Navigator.pop(context);
+                    // This will trigger a refresh on the home page
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActionCard(
+                  'Support',
+                  'Get help and support',
+                  Icons.help_outline,
+                  AppTheme.secondaryColor,
+                  () {
+                    _showSnackBar('Support feature coming soon!', AppTheme.primaryColor);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCard(
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    ToastContext().init(context);
-    Size size = MediaQuery.of(context).size;
     return Scaffold(
-      appBar: _appBar(context),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Container(
-                height: size.height / 2,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _displayImage(),
-                    _displayUserName(context),
-                    _displayDarkModeOption(),
-                    _displayDarkMessage(),
-                  ],
-                ),
-              ),
-              Container(
-                height: size.height - size.height / 2,
-                width: size.width,
-                decoration: BoxDecoration(
-                    color: Colors.deepOrange,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(60.0),
-                      topRight: Radius.circular(60.0),
-                    ),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Colors.purple, Colors.blue],
-                    )),
-                child: Stack(
-                  children: <Widget>[
-                    Padding(
-                      padding: const EdgeInsets.only(top: 30.0),
-                      child: _displayTextField(),
-                    ),
-                    _displayButtonToSave(),
-                  ],
-                ),
-              ),
-            ],
-          ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 16),
+            _buildProfileStats(),
+            const SizedBox(height: 16),
+            _buildApiKeySection(),
+            const SizedBox(height: 16),
+            _buildQuickActions(),
+            const SizedBox(height: 80), // Bottom padding
+          ],
         ),
       ),
     );
